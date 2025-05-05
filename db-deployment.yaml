@@ -1,0 +1,75 @@
+---
+# ConfigMap para configuração do PostgreSQL
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  labels:
+    app: postgres
+data:
+  POSTGRES_DB: LimaInterprise
+  POSTGRES_USER: docker
+  POSTGRES_PASSWORD: 02RhajeVHhwAHkihczZe
+  # A configuração abaixo pode ser necessária se os dados já existirem
+  POSTGRES_HOST_AUTH_METHOD: md5
+---
+# Deployment do PostgreSQL usando o volume existente
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      volumes:
+        - name: postgres-pv
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+      containers:
+        - name: postgres
+          image: postgres:17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-pv
+---
+# Service para expor o PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  labels:
+    app: postgres
+spec:
+  type: NodePort
+  ports:
+   - port: 5432
+     targetPort: 5432
+     nodePort: 30432
+  selector:
+   app: postgres
